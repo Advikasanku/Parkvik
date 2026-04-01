@@ -1,0 +1,241 @@
+import tkinter as tk
+from tkinter import messagebox
+from PIL import Image, ImageTk
+import json, os
+
+USERS_FILE = "users.json"
+SLOTS_FILE = "slots.json"
+
+# -------------------- Data --------------------
+
+def load_data(file):
+    if not os.path.exists(file):
+        return {}
+    with open(file, "r") as f:
+        return json.load(f)
+
+def save_data(file, data):
+    with open(file, "w") as f:
+        json.dump(data, f, indent=4)
+
+def init_users():
+    save_data(USERS_FILE, {})
+
+def init_slots():
+    slots = {f"SLOT{i}": None for i in range(1, 11)}
+    save_data(SLOTS_FILE, slots)
+
+# -------------------- App --------------------
+
+class ParkVik:
+    def _init_(self, root):
+        self.root = root
+        self.root.title("ParkVik 🚗")
+        self.root.geometry("360x640")
+        self.root.configure(bg="#0f172a")
+        self.root.resizable(False, False)
+
+        self.user = None
+
+        init_users()
+        init_slots()
+
+        self.load_images()
+        self.fade_in()
+        self.home()
+
+    # -------------------- Animation --------------------
+
+    def fade_in(self):
+        for i in range(0, 100):
+            self.root.attributes("-alpha", i/100)
+            self.root.update()
+            self.root.after(5)
+
+    def hover_effect(self, btn, color, hover):
+        btn.bind("<Enter>", lambda e: btn.config(bg=hover))
+        btn.bind("<Leave>", lambda e: btn.config(bg=color))
+
+    # -------------------- Images --------------------
+
+    def load_images(self):
+        try:
+            self.car_img = ImageTk.PhotoImage(Image.open("car.png").resize((80,80)))
+        except:
+            self.car_img = None
+
+    # -------------------- UI Helpers --------------------
+
+    def clear(self):
+        for w in self.root.winfo_children():
+            w.destroy()
+
+    def title(self, text):
+        tk.Label(self.root, text=text,
+                 font=("Segoe UI", 18, "bold"),
+                 bg="#0f172a", fg="#facc15").pack(pady=10)
+
+    def card(self):
+        frame = tk.Frame(self.root, bg="#1e293b")
+        frame.pack(pady=12, padx=15, fill="x")
+        return frame
+
+    def button(self, parent, text, cmd, color, hover):
+        btn = tk.Button(parent, text=text,
+                        bg=color, fg="white",
+                        font=("Segoe UI", 11, "bold"),
+                        relief="flat", height=2,
+                        command=cmd)
+        btn.pack(fill="x", pady=6)
+        self.hover_effect(btn, color, hover)
+
+    def entry(self, parent):
+        return tk.Entry(parent,
+                        bg="#334155",
+                        fg="white",
+                        insertbackground="white",
+                        font=("Segoe UI", 11),
+                        relief="flat")
+
+    # -------------------- Screens --------------------
+
+    def home(self):
+        self.clear()
+
+        if self.car_img:
+            tk.Label(self.root, image=self.car_img, bg="#0f172a").pack(pady=5)
+
+        self.title("🚗 ParkVik")
+
+        card = self.card()
+        self.button(card, "Login", self.login, "#3b82f6", "#2563eb")
+        self.button(card, "Register", self.register, "#22c55e", "#16a34a")
+
+    def register(self):
+        self.clear()
+        self.title("Create Account")
+
+        card = self.card()
+
+        user = self.entry(card)
+        pwd = self.entry(card)
+        pwd.config(show="*")
+
+        user.pack(pady=5, fill="x")
+        pwd.pack(pady=5, fill="x")
+
+        def do_register():
+            users = load_data(USERS_FILE)
+            if user.get() in users:
+                messagebox.showerror("Error", "User exists")
+            else:
+                users[user.get()] = {"password": pwd.get()}
+                save_data(USERS_FILE, users)
+                messagebox.showinfo("Success", "Account created!")
+                self.home()
+
+        self.button(card, "Register", do_register, "#22c55e", "#16a34a")
+        self.button(card, "Back", self.home, "#64748b", "#475569")
+
+    def login(self):
+        self.clear()
+        self.title("Login")
+
+        card = self.card()
+
+        user = self.entry(card)
+        pwd = self.entry(card)
+        pwd.config(show="*")
+
+        user.pack(pady=5, fill="x")
+        pwd.pack(pady=5, fill="x")
+
+        def do_login():
+            users = load_data(USERS_FILE)
+            if user.get() in users and users[user.get()]["password"] == pwd.get():
+                self.user = user.get()
+                self.dashboard()
+            else:
+                messagebox.showerror("Error", "Invalid login")
+
+        self.button(card, "Login", do_login, "#3b82f6", "#2563eb")
+        self.button(card, "Back", self.home, "#64748b", "#475569")
+
+    def dashboard(self):
+        self.clear()
+        self.title(f"Hi {self.user} 👋")
+
+        card = self.card()
+        self.button(card, "Book Parking", self.slots, "#22c55e", "#16a34a")
+        self.button(card, "Cancel Booking", self.cancel, "#f59e0b", "#d97706")
+        self.button(card, "Logout", self.home, "#ef4444", "#dc2626")
+
+    # -------------------- Slots --------------------
+
+    def slots(self):
+        self.clear()
+        self.title("Select Slot")
+
+        slots = load_data(SLOTS_FILE)
+        grid = tk.Frame(self.root, bg="#0f172a")
+        grid.pack()
+
+        for i, (slot, user) in enumerate(slots.items()):
+            num = slot.replace("SLOT", "")
+
+            if user is None:
+                color = "#22c55e"
+            elif user == self.user:
+                color = "#38bdf8"
+            else:
+                color = "#ef4444"
+
+            def book(s=slot):
+                if slots[s] is not None:
+                    messagebox.showerror("Error", "Booked")
+                    return
+                if messagebox.askyesno("Payment", "Pay ₹50?"):
+                    slots[s] = self.user
+                    save_data(SLOTS_FILE, slots)
+                    self.slots()
+
+            btn = tk.Button(grid, text=f"🚗\n{num}",
+                            bg=color, fg="white",
+                            font=("Segoe UI", 10, "bold"),
+                            width=8, height=4,
+                            relief="flat",
+                            command=book)
+            btn.grid(row=i//2, column=i%2, padx=10, pady=10)
+
+            self.hover_effect(btn, color, "#6366f1")
+
+        tk.Button(self.root, text="Back", command=self.dashboard,
+                  bg="#64748b", fg="white").pack(pady=10)
+
+    def cancel(self):
+        self.clear()
+        self.title("Cancel Booking")
+
+        slots = load_data(SLOTS_FILE)
+        my = [s for s, u in slots.items() if u == self.user]
+
+        for s in my:
+            num = s.replace("SLOT", "")
+
+            def cancel_slot(slot=s):
+                slots[slot] = None
+                save_data(SLOTS_FILE, slots)
+                self.dashboard()
+
+            tk.Button(self.root, text=f"Cancel {num}",
+                      bg="#ef4444", fg="white",
+                      height=2).pack(pady=5, padx=20, fill="x")
+
+        tk.Button(self.root, text="Back", command=self.dashboard,
+                  bg="#64748b", fg="white").pack(pady=10)
+
+# -------------------- Run --------------------
+
+root = tk.Tk()
+app = ParkVik(root)
+root.mainloop()
