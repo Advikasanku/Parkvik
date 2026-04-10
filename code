@@ -28,7 +28,7 @@ def init_slots():
 # -------------------- App --------------------
 
 class ParkVik:
-    def _init_(self, root):
+    def __init__(self, root):  # ✅ FIXED
         self.root = root
         self.root.title("ParkVik 🚗")
         self.root.geometry("360x640")
@@ -37,8 +37,12 @@ class ParkVik:
 
         self.user = None
 
-        init_users()
-        init_slots()
+        # ✅ FIXED (prevent overwrite)
+        if not os.path.exists(USERS_FILE):
+            init_users()
+
+        if not os.path.exists(SLOTS_FILE):
+            init_slots()
 
         self.load_images()
         self.fade_in()
@@ -219,6 +223,11 @@ class ParkVik:
         slots = load_data(SLOTS_FILE)
         my = [s for s, u in slots.items() if u == self.user]
 
+        # ✅ FIXED (empty state)
+        if not my:
+            tk.Label(self.root, text="No bookings found",
+                     bg="#0f172a", fg="white").pack(pady=10)
+
         for s in my:
             num = s.replace("SLOT", "")
 
@@ -227,9 +236,11 @@ class ParkVik:
                 save_data(SLOTS_FILE, slots)
                 self.dashboard()
 
+            # ✅ FIXED (command added)
             tk.Button(self.root, text=f"Cancel {num}",
                       bg="#ef4444", fg="white",
-                      height=2).pack(pady=5, padx=20, fill="x")
+                      height=2,
+                      command=cancel_slot).pack(pady=5, padx=20, fill="x")
 
         tk.Button(self.root, text="Back", command=self.dashboard,
                   bg="#64748b", fg="white").pack(pady=10)
